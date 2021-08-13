@@ -428,10 +428,12 @@ Signal an error if the id cannot be determined."
               (gitea             'gtea-repository-id)
               (gogs              'gogs-repository-id)
               (bitbucket         'buck-repository-id)
+              (pagure            'pagure-repository-id)
               (t (intern (format "%s-repository-id" forge))))))
     (unless (fboundp fn)
       (error "ghub-repository-id: Forge type/abbreviation `%s' is unknown"
              forge))
+    (print (funcall fn owner name :username username :auth auth :host host))
     (or (funcall fn owner name :username username :auth auth :host host)
         (and (not noerror)
              (error "Repository %S does not exist on %S.\n%s%S?"
@@ -703,13 +705,13 @@ and call `auth-source-forget+'."
     (setq username (ghub--username host forge)))
   (if (eq auth 'basic)
       (cl-ecase forge
-        ((nil gitea gogs bitbucket)
+        ((nil gitea gogs bitbucket pagure)
          (cons "Authorization" (ghub--basic-auth host username)))
         ((github gitlab)
          (error "%s does not support basic authentication"
                 (capitalize (symbol-name forge)))))
     (cons (cl-ecase forge
-            ((nil github gitea gogs bitbucket)
+            ((nil github gitea gogs bitbucket pagure)
              "Authorization")
             (gitlab
              "Private-Token"))
@@ -782,7 +784,10 @@ or (info \"(ghub)Getting Started\") for instructions.
          (bound-and-true-p gogs-default-host)))
     (bitbucket
      (or (ignore-errors (car (process-lines "git" "config" "bitbucket.host")))
-         (bound-and-true-p buck-default-host)))))
+         (bound-and-true-p buck-default-host)))
+    (pagure
+     (or (ignore-errors (car (process-lines "git" "config" "pagure.host")))
+         (bound-and-true-p pagure-default-host)))))
 
 (cl-defmethod ghub--username (host &optional forge)
   (let ((var
@@ -799,6 +804,10 @@ or (info \"(ghub)Getting Started\") for instructions.
             (if (equal host "api.bitbucket.org/2.0")
                 "bitbucket.user"
               (format "bitbucket.%s.user" host)))
+           (pagure
+            (if (equal host "pagure.io/api/0")
+                "pagure.user"
+              (format "pagure.%s.user" host)))
            (gitea
             (when (zerop (call-process "git" nil nil nil "config" "gitea.host"))
               (error "gitea.host is set but always ignored"))
